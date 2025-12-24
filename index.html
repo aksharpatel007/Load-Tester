@@ -1,0 +1,411 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Load Tester</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
+
+    <style>
+        :root {
+            --bg-dark: #121212;
+            --bg-sidebar: #0f0f0f;
+            --card-bg: #1e1e1e;
+            --accent: #4c8bf5;
+            --accent-glow: rgba(76, 139, 245, 0.4);
+            --text-main: #e0e0e0;
+            --text-muted: #a0a0a0;
+        }
+
+        body { margin: 0; font-family: 'Segoe UI', Roboto, Helvetica, sans-serif; background-color: var(--bg-dark); color: var(--text-main); display: flex; height: 100vh; overflow: hidden; }
+
+        /* --- ADVANCED SPLASH ANIMATIONS --- */
+        #splash-screen { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: var(--bg-dark); display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 9999; transition: opacity 0.8s ease-out, visibility 0.8s; }
+        .splash-hidden { opacity: 0; visibility: hidden; pointer-events: none; }
+
+        /* Logo Pop In */
+        .splash-logo { font-size: 100px; animation: popIn 1s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards; opacity: 0; transform: scale(0); color: var(--accent); filter: drop-shadow(0 0 20px var(--accent-glow)); }
+
+        /* Title Slides Out From Logo */
+        .splash-title { font-size: 48px; font-weight: 800; margin-top: 10px; background: linear-gradient(135deg, #fff, var(--accent)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; opacity: 0; animation: slideOutFromLogo 1s ease-out forwards; animation-delay: 0.5s; }
+
+        @keyframes popIn {
+            0% { opacity: 0; transform: scale(0) rotate(-180deg); }
+            100% { opacity: 1; transform: scale(1) rotate(0deg); }
+        }
+        @keyframes slideOutFromLogo {
+            0% { opacity: 0; transform: translateY(-50px) scale(0.5); }
+            100% { opacity: 1; transform: translateY(0) scale(1); }
+        }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+
+        /* --- GENERAL UI --- */
+        .logo-spin { display: inline-block; animation: spin 8s infinite linear; color: var(--accent); filter: drop-shadow(0 0 15px var(--accent-glow)); }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+        /* --- SIDEBAR & NAVIGATION --- */
+        #menu-trigger { position: fixed; top: 20px; left: 20px; z-index: 2000; cursor: pointer; background: rgba(0,0,0,0.6); padding: 12px; border-radius: 50%; transition: 0.3s; backdrop-filter: blur(5px); border: 1px solid rgba(255,255,255,0.1); display: none; }
+        #menu-trigger:hover { background: rgba(76, 139, 245, 0.2); border-color: var(--accent); transform: scale(1.1); }
+
+        .sidebar { position: fixed; left: -320px; top: 0; height: 100vh; width: 280px; background-color: var(--bg-sidebar); padding: 80px 20px 20px 20px; display: flex; flex-direction: column; border-right: 1px solid #333; box-shadow: 10px 0 30px rgba(0,0,0,0.5); z-index: 1500; transition: left 0.4s cubic-bezier(0.4, 0, 0.2, 1); }
+        .sidebar.active { left: 0; }
+        .history-item { padding: 12px; margin: 5px 0; border-radius: 8px; font-size: 13px; color: var(--text-muted); cursor: pointer; transition: 0.2s; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .history-item:hover { background: #333; color: white; padding-left: 15px; }
+        .user-panel { margin-top: auto; padding-top: 20px; border-top: 1px solid #333; display: flex; align-items: center; gap: 10px; }
+        .user-avatar { width: 35px; height: 35px; background: linear-gradient(135deg, var(--accent), #2b5cb3); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; }
+
+        /* --- CONTENT AREA --- */
+        .main-content { flex: 1; padding: 40px; overflow-y: auto; display: flex; flex-direction: column; align-items: center; position: relative; justify-content: center; width: 100%; }
+        .page-view { display: none; width: 100%; max-width: 900px; }
+        .active-view { display: block; animation: fadeIn 0.6s ease-out; }
+
+        /* --- FORMS & CARDS --- */
+        .auth-box { background: var(--card-bg); padding: 40px 35px; border-radius: 20px; border: 1px solid #333; box-shadow: 0 15px 50px rgba(0,0,0,0.6); max-width: 420px; width: 100%; text-align: center; margin: auto; }
+        .app-title { font-size: 32px; font-weight: 800; margin: 15px 0 5px 0; background: linear-gradient(135deg, #fff, var(--accent)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+
+        input { width: 100%; box-sizing: border-box; padding: 14px; margin: 10px 0; background: #151515; border: 1px solid #444; color: white; border-radius: 8px; outline: none; transition: 0.3s; font-size: 15px; }
+        input:focus { border-color: var(--accent); box-shadow: 0 0 15px rgba(76, 139, 245, 0.2); }
+        button { width: 100%; padding: 14px; background: var(--accent); color: white; border: none; border-radius: 8px; cursor: pointer; font-size: 16px; margin-top: 15px; font-weight: bold; transition: 0.3s; box-shadow: 0 4px 15px rgba(76, 139, 245, 0.3); }
+        button:hover { filter: brightness(1.1); transform: translateY(-2px); }
+
+        .tool-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 25px; margin-bottom: 30px; }
+        .tool-card { background: var(--card-bg); padding: 30px; border-radius: 16px; border: 1px solid #333; cursor: pointer; transition: 0.3s; text-align: center; box-shadow: 0 5px 20px rgba(0,0,0,0.2); }
+        .tool-card:hover { border-color: var(--accent); background: #2a2a2a; transform: translateY(-5px); box-shadow: 0 15px 40px rgba(0,0,0,0.5); }
+        .tool-card i { font-size: 34px; color: var(--accent); margin-bottom: 15px; }
+
+        .full-tool-page { background: var(--card-bg); padding: 40px; border-radius: 16px; border: 1px solid #333; box-shadow: 0 10px 40px rgba(0,0,0,0.5); position: relative; }
+        .back-btn { background: transparent; color: var(--text-muted); width: auto; padding: 5px 10px; margin-bottom: 20px; display: inline-block; box-shadow: none; }
+        .back-btn:hover { color: white; background: transparent; transform: translateX(-5px); }
+        .graph-wrapper { margin-top: 30px; background: #151515; padding: 20px; border-radius: 12px; border: 1px solid #333; height: 300px; position: relative; }
+        .loader-overlay { display: none; text-align: center; margin-top: 30px; padding: 30px; background: rgba(0,0,0,0.3); border-radius: 16px; border: 1px solid #333; }
+        .compare-inputs { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
+
+        @media (max-width: 768px) {
+            .splash-title { font-size: 32px; }
+            .main-content { padding: 20px; }
+            .tool-grid { grid-template-columns: 1fr; }
+            .compare-inputs { grid-template-columns: 1fr; }
+            .full-tool-page { padding: 20px; }
+        }
+    </style>
+</head>
+<body>
+
+    <div id="splash-screen">
+        <i class="bi bi-gear-wide-connected splash-logo"></i>
+        <h1 class="splash-title">Load Tester</h1>
+    </div>
+
+    <div id="menu-trigger">
+        <i class="bi bi-gear-wide-connected logo-spin" style="font-size: 32px;"></i>
+    </div>
+
+    <div class="sidebar" id="sidebar">
+        <div style="font-size: 11px; color: #666; font-weight: bold; margin-bottom: 10px; text-transform: uppercase;">History & Profile</div>
+        <div id="history-list"><div class="history-item">Loading history...</div></div>
+        <div class="user-panel">
+            <div class="user-avatar" id="avatar">U</div>
+            <div style="font-size:14px;">
+                <div id="username-display">User</div>
+                <div style="font-size:11px; color:#888; cursor:pointer;" onclick="logout()">Log out</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="main-content">
+
+        <div id="page-login" class="page-view active-view">
+            <div class="auth-box">
+                <h1 class="app-title">Load Tester</h1>
+
+                <p style="color:#aaa; margin-bottom: 30px;">Welcome back. Please login.</p>
+                <input type="email" id="login-email" placeholder="Email Address">
+                <input type="password" id="login-pass" placeholder="Password">
+                <button onclick="login()">Sign In</button>
+                <p style="margin-top:20px; font-size: 13px; color:#777;">No account? <a href="#" style="color:var(--accent);" onclick="switchPage('page-signup')">Create one</a></p>
+            </div>
+        </div>
+
+        <div id="page-signup" class="page-view">
+            <div class="auth-box">
+                <h1 class="app-title">Create Account</h1>
+                <input type="text" id="signup-name" placeholder="Full Name">
+                <input type="email" id="signup-email" placeholder="Email Address">
+                <input type="password" id="signup-pass" placeholder="Choose Password">
+                <button onclick="signup()">Sign Up</button>
+                <p style="margin-top:20px; font-size: 13px; color:#777;">Has account? <a href="#" style="color:var(--accent);" onclick="switchPage('page-login')">Login here</a></p>
+            </div>
+        </div>
+
+        <div id="page-dashboard" class="page-view">
+            <div style="text-align: center; margin-bottom: 40px;">
+                <h1 id="welcome-header">Hello, User</h1>
+                <p style="color:#aaa; font-size: 18px;">Select a tool to begin optimization</p>
+            </div>
+            <div class="tool-grid">
+                <div class="tool-card" onclick="switchPage('page-single')">
+                    <i class="fa-solid fa-gauge-high"></i>
+                    <h3>Single Load Test</h3>
+                    <p style="font-size:14px; color:#888;">Stress test a single URL with Area Graph.</p>
+                </div>
+                <div class="tool-card" onclick="switchPage('page-compare')">
+                    <i class="fa-solid fa-scale-balanced"></i>
+                    <h3>Compare Sites</h3>
+                    <p style="font-size:14px; color:#888;">Race two websites with live graphs.</p>
+                </div>
+            </div>
+        </div>
+
+        <div id="page-single" class="page-view">
+            <div class="full-tool-page">
+                <button class="back-btn" onclick="switchPage('page-dashboard')">← Back to Dashboard</button>
+                <h2 style="margin-top:0;"><i class="fa-solid fa-gauge-high"></i> Single Site Stress Test</h2>
+
+                <input type="text" id="single-url" placeholder="https://example.com">
+                <input type="number" id="single-req" placeholder="Number of Requests (e.g., 50)">
+                <button onclick="runSingleTest()" id="btn-single">Run Analysis</button>
+
+                <div id="single-loader" class="loader-overlay">
+                    <i class="bi bi-gear-wide-connected logo-spin" style="font-size: 50px;"></i>
+                    <div style="margin-top:15px; color:var(--accent); font-weight:bold;">ANALYZING...</div>
+                </div>
+
+                <div id="single-result" style="display:none; margin-top:30px;">
+                    <div style="display:flex; justify-content:space-between; font-weight:bold; font-size: 18px;">
+                        <span>Success Rate: <span id="res-pct" style="color: var(--accent);">0%</span></span>
+                        <span>Avg Time: <span id="res-time" style="color: white;">0s</span></span>
+                    </div>
+                    <div class="graph-wrapper">
+                        <canvas id="singleChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div id="page-compare" class="page-view">
+            <div class="full-tool-page">
+                <button class="back-btn" onclick="switchPage('page-dashboard')">← Back to Dashboard</button>
+                <h2 style="margin-top:0;"><i class="fa-solid fa-scale-balanced"></i> Website Face-off</h2>
+
+                <div class="compare-inputs">
+                    <input type="text" id="comp-url1" placeholder="Site 1 URL">
+                    <input type="text" id="comp-url2" placeholder="Site 2 URL">
+                </div>
+                <input type="number" id="comp-req" placeholder="Number of Requests per Site (e.g., 10)" value="5">
+
+                <button onclick="runCompare()" id="btn-comp">Begin Race</button>
+
+                <div id="comp-loader" class="loader-overlay">ai
+                    <i class="bi bi-gear-wide-connected logo-spin" style="font-size: 50px;"></i>
+                    <div style="margin-top:15px; color:var(--accent); font-weight:bold;">RACING WEBSITES...</div>
+                </div>
+
+                <div id="comp-result" style="display:none; margin-top:20px;">
+                    <div style="display:flex; justify-content: space-around; text-align:center; margin-bottom: 20px;">
+                        <div>
+                            <div style="color:#888; font-size:12px;">SITE 1 AVG</div>
+                            <div id="r-time1" style="font-size:24px; color:var(--accent); font-weight:bold;">0.00s</div>
+                        </div>
+                        <div style="font-size:24px; font-weight:bold; color:#555;">VS</div>
+                        <div>
+                            <div style="color:#888; font-size:12px;">SITE 2 AVG</div>
+                            <div id="r-time2" style="font-size:24px; color:var(--accent); font-weight:bold;">0.00s</div>
+                        </div>
+                    </div>
+                    <div id="winner-text" style="text-align:center; color:#00e676; font-weight:bold; font-size: 18px; margin-bottom:20px;"></div>
+                    <div class="graph-wrapper">
+                        <canvas id="compareChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        // --- UI & NAVIGATION ---
+        const sidebar = document.getElementById('sidebar');
+        const trigger = document.getElementById('menu-trigger');
+        let isLocked = false;
+
+        trigger.addEventListener('mouseenter', () => sidebar.classList.add('active'));
+        trigger.addEventListener('click', () => { isLocked = !isLocked; sidebar.classList.toggle('active', isLocked); });
+        sidebar.addEventListener('mouseleave', () => { if (!isLocked) sidebar.classList.remove('active'); });
+
+        // Intro Animation Timer
+        document.addEventListener('DOMContentLoaded', () => {
+            setTimeout(() => document.getElementById('splash-screen').classList.add('splash-hidden'), 3500);
+        });
+
+        let currentUserId = null;
+        let singleChart = null;
+        let comparisonChart = null;
+
+        function switchPage(pageId) {
+            document.querySelectorAll('.page-view').forEach(div => div.classList.remove('active-view'));
+            document.getElementById(pageId).classList.add('active-view');
+            const showNav = (pageId === 'page-dashboard' || pageId.startsWith('page-single') || pageId.startsWith('page-compare'));
+            document.getElementById('menu-trigger').style.display = showNav ? 'block' : 'none';
+        }
+
+        async function login() {
+            const email = document.getElementById('login-email').value;
+            const password = document.getElementById('login-pass').value;
+            const res = await fetch('/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email, password }) });
+            const data = await res.json();
+            if (data.user_id) {
+                currentUserId = data.user_id;
+                document.getElementById('username-display').innerText = data.username;
+                document.getElementById('welcome-header').innerText = `Hello, ${data.username}`;
+                document.getElementById('avatar').innerText = data.username.charAt(0).toUpperCase();
+                switchPage('page-dashboard');
+                loadHistory();
+            } else { alert(data.error); }
+        }
+
+        async function signup() {
+            const username = document.getElementById('signup-name').value;
+            const email = document.getElementById('signup-email').value;
+            const password = document.getElementById('signup-pass').value;
+            const res = await fetch('/signup', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username, email, password }) });
+            if(res.ok) switchPage('page-login');
+        }
+
+        function logout() { location.reload(); }
+
+        // --- SINGLE LOAD TEST ---
+        async function runSingleTest() {
+            const url = document.getElementById('single-url').value;
+            const requests = document.getElementById('single-req').value;
+            const btn = document.getElementById('btn-single');
+
+            btn.disabled = true;
+            document.getElementById('single-result').style.display = 'none';
+            document.getElementById('single-loader').style.display = 'block';
+
+            const res = await fetch('/load-test', {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ url, requests, user_id: currentUserId })
+            });
+            const data = await res.json();
+
+            document.getElementById('single-loader').style.display = 'none';
+            document.getElementById('single-result').style.display = 'block';
+            document.getElementById('res-pct').innerText = data.success + '%';
+            document.getElementById('res-time').innerText = data.time + 's';
+
+            const ctx = document.getElementById('singleChart').getContext('2d');
+            if(singleChart) singleChart.destroy();
+
+            singleChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: Array.from({length: data.history.length}, (_, i) => i + 1),
+                    datasets: [{
+                        label: 'Response Time (s)',
+                        data: data.history,
+                        borderColor: '#00e676',
+                        backgroundColor: 'rgba(0, 230, 118, 0.2)',
+                        fill: true,
+                        tension: 0.4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { labels: { color: 'white' } } },
+                    scales: {
+                        y: { ticks: { color: '#aaa' }, grid: { color: '#333' } },
+                        x: { ticks: { color: '#aaa' }, grid: { color: '#333' } }
+                    }
+                }
+            });
+
+            btn.disabled = false;
+            loadHistory();
+        }
+
+        // --- COMPARE SITES ---
+        async function runCompare() {
+            const url1 = document.getElementById('comp-url1').value;
+            const url2 = document.getElementById('comp-url2').value;
+            const reqs = document.getElementById('comp-req').value || 5;
+            const btn = document.getElementById('btn-comp');
+
+            btn.disabled = true;
+            document.getElementById('comp-result').style.display = 'none';
+            document.getElementById('comp-loader').style.display = 'block';
+
+            const res = await fetch('/compare', {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ url1, url2, requests: reqs })
+            });
+            const data = await res.json();
+
+            document.getElementById('comp-loader').style.display = 'none';
+            document.getElementById('comp-result').style.display = 'block';
+
+            document.getElementById('r-time1').innerText = data[0].avg_time + 's';
+            document.getElementById('r-time2').innerText = data[1].avg_time + 's';
+            let winner = data[0].avg_time < data[1].avg_time ? "🏆 Winner: " + data[0].url : "🏆 Winner: " + data[1].url;
+            document.getElementById('winner-text').innerText = winner;
+
+            const ctx = document.getElementById('compareChart').getContext('2d');
+            if(comparisonChart) comparisonChart.destroy();
+
+            const labels = Array.from({length: data[0].times.length}, (_, i) => `Req ${i + 1}`);
+
+            comparisonChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [
+                        {
+                            label: 'Site 1',
+                            data: data[0].times,
+                            borderColor: '#4c8bf5',
+                            backgroundColor: 'rgba(76, 139, 245, 0.3)',
+                            fill: true,
+                            tension: 0.4
+                        },
+                        {
+                            label: 'Site 2',
+                            data: data[1].times,
+                            borderColor: '#ff9800',
+                            backgroundColor: 'rgba(255, 152, 0, 0.3)',
+                            fill: true,
+                            tension: 0.4
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { labels: { color: 'white' } } },
+                    scales: {
+                        y: { ticks: { color: '#aaa' }, grid: { color: '#333' } },
+                        x: { ticks: { color: '#aaa' }, grid: { color: '#333' } }
+                    }
+                }
+            });
+
+            btn.disabled = false;
+        }
+
+        async function loadHistory() {
+            const res = await fetch('/history', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ user_id: currentUserId }) });
+            const data = await res.json();
+            const list = document.getElementById('history-list');
+            list.innerHTML = '';
+            data.forEach(item => {
+                const div = document.createElement('div');
+                div.className = 'history-item';
+                div.innerHTML = `<i class="fa-solid fa-clock-rotate-left"></i> ${item.url.replace('https://','')} (${item.success}%)`;
+                list.appendChild(div);
+            });
+        }
+    </script>
+</body>
+</html>
